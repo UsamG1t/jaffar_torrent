@@ -1,0 +1,11 @@
+arge
+arge.c
+argv
+argv.c
+file
+file.c
+file.txt
+str_inout
+str_inout.c
+strtol
+strtol.c
