@@ -1,9 +1,13 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#include <sys/socket.h>
+#include <sys/un.h>
 
 enum
 {
@@ -27,7 +31,7 @@ main(int argc, char **argv)
     pid_t pid;
     
     if (argc < 2 || (argc == 2 && !strcmp(argv[1], "client"))) {
-        printf("Usage: %s server | [client <your_name>] \n\t\"_exit\" to quit", argv[0]);
+        printf("Usage: %s server | [client <your_name>] \n\t\"_exit\" to poweroff server\n\t\"quit\" to just exit\n", argv[0]);
         return 0;
     }
 
@@ -64,9 +68,9 @@ main(int argc, char **argv)
         }
 
     
-        while (printf(">>: "), scanf("%s", buf) == 1) {
+        while (printf(">>: "), fgets(buf, BUFLEN, stdin) != NULL) {
 
-            if (!strcmp(buf, "_exit") || !strcmp(buf, "quit")) {
+            if (!strncmp(buf, "_exit", 5) || !strncmp(buf, "quit", 4)) {
                 send(sockfd, buf, strlen(buf) + 1, 0);
                 break;
             }
@@ -100,7 +104,7 @@ main(int argc, char **argv)
 
     while(1) {
         memset(&friend_addr, 0, sizeof(friend_addr));
-        friend_len = sizeof(friend_addr);
+        socklen_t friend_len = sizeof(friend_addr);
         if ((client_sockfd = accept(sockfd, (struct sockaddr*) &friend_addr, &friend_len)) < 0) {
             printf("server: error accepting socket!");
             break;
@@ -120,11 +124,11 @@ main(int argc, char **argv)
 
                 fprintf(stderr, "server_fork: received from client: %s\n", buf);
 
-                if (!strcmp(buf, "_exit")) {
+                if (!strncmp(buf, "_exit", 5)) {
                     status = 1;
                     fprintf(stderr, "server_fork: stoping server\n");
                     break;
-                } else if (!strcmp(buf, "quit")) {
+                } else if (!strncmp(buf, "quit", 4)) {
                     fprintf(stderr, "server_fork: quit cmd\n");
                     break;
                 } else if (!strncmp(buf, "run", 3)) {
@@ -158,9 +162,14 @@ main(int argc, char **argv)
             return status;
         }
 
-        waitpid(0, &status, WNOHANG);
-        
+        waitpid(-1, &status, WNOHANG);
+        if (WIFEXITED(status) && WEXITSTATUS(status)) {
+            fprintf(stderr, "server: stoping\n");
+            break;
+        }
     } // while
+
+    while (wait(NULL) != -1);
 
     shutdown(sockfd, 2);
     close(sockfd);
